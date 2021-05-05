@@ -17,7 +17,7 @@ public class GestorDonacionesDriver {
             registry = LocateRegistry.createRegistry(9991);
         }catch (RemoteException e){
             registry = LocateRegistry.getRegistry(9991);
-            System.out.println(e.getMessage());
+            System.out.println("Puerto ocupado, utilizando el registro existente...");
         }
 
         String nombre = "gestor" + args[0];
