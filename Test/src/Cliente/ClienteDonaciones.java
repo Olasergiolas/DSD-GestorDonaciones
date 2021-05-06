@@ -2,13 +2,13 @@ package Cliente;
 
 import Servidor.GestorDonaciones;
 import Servidor.GestorDonacionesI;
-import javafx.util.Pair;
 
 import java.net.MalformedURLException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.AbstractMap;
+import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class ClienteDonaciones  extends UnicastRemoteObject implements
@@ -38,9 +38,41 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
 
     @Override
     public void run(){
+        int eleccion = -1;
+        boolean continuar = true;
+        Scanner input = new Scanner(System.in);
+
+        while(continuar) {
+            System.out.println("****************************************");
+            System.out.println("Bienvenido!");
+            System.out.println("[1] Registrarte");
+            System.out.println("[2] Iniciar Sesión");
+            System.out.println("****************************************");
+
+            if (input.hasNextInt()) {
+                eleccion = input.nextInt();
+                if (eleccion == 1 || eleccion == 2)
+                    continuar = false;
+
+                else
+                    System.out.println("\nOpción no disponible");
+            }
+            else{
+                System.out.println("\nPor favor, introduzca un entero");
+                input.next();
+                continue;
+            }
+        }
+
         try {
-            registrarme(gestor);
-            broadcastMSG("Prueba");
+            switch (eleccion){
+                case 1:
+                    registrarme(gestor);
+                    break;
+                case 2:
+                    broadcastMSG("Prueba");
+                    break;
+            }
         }catch (RemoteException | MalformedURLException | NotBoundException e){
             e.printStackTrace();
         }

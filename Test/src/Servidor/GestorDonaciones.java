@@ -75,7 +75,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     }
 
     @Override
-    public void addCliente(ClienteDonacionesI cliente) {
+    public synchronized void addCliente(ClienteDonacionesI cliente) {
         clientes.add(cliente);
         System.out.println("Añadido un nuevo cliente!");
     }
@@ -112,16 +112,14 @@ public class GestorDonaciones extends UnicastRemoteObject implements
 
         if (!nombre_replicas.equals(nombre_replicas_actual)){
             nombre_replicas = nombre_replicas_actual;
+            replicas.clear();
 
             for (int i = 0; i < nombre_replicas.size(); ++i){
                 replica_n = "rmi:" + nombre_replicas.get(i);
                 GestorDonacionesI gestor = (GestorDonacionesI) Naming.lookup(replica_n);
-                if (!replicas.contains(gestor) && !replica_n.equals("rmi://localhost:9991/gestor" + id))
+                if (!replica_n.equals("rmi://localhost:9991/gestor" + id))
                     replicas.add(gestor);
 
-                //System.out.println(nombre_replicas.get(i));
-
-                // TODO Gestionar réplicas que desaparecen
                 // TODO Parametrizar el servidor a utilizar
             }
         }
