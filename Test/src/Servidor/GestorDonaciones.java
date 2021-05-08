@@ -24,14 +24,16 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     int id = -1;
     long subtotal;
     long total;
+    String server;
     ArrayList<GestorDonacionesI> replicas;
     ArrayList<String> nombre_replicas;
     HashMap<String, Boolean> clientes;
 
-    public GestorDonaciones(int id, long total) throws RemoteException {
+    public GestorDonaciones(int id, long total, String server) throws RemoteException {
         super();
         this.id = id;
         this.total = total;
+        this.server = server;
         subtotal = 0;
         replicas = new ArrayList<GestorDonacionesI>();
         clientes = new HashMap<>();
@@ -108,7 +110,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     @Override
     public synchronized void addCliente(String username) {
         clientes.put(username, false);
-        System.out.println("Añadido un nuevo cliente!");
+        System.out.println("Añadido un nuevo cliente!: " + username);
     }
 
     public boolean estaRegistrado(String username) throws RemoteException{
@@ -152,6 +154,11 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     }
 
     @Override
+    public long getTotalDonado(String username) throws RemoteException {
+        return (clientes.get(username) == true) ? getTotalDonado() : -1;
+    }
+
+    @Override
     public long getSubTotalDonado() throws RemoteException {
         return subtotal;
     }
@@ -181,7 +188,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     public void actualizarListadoReplicas() throws RemoteException,
             MalformedURLException, NotBoundException {
         String replica_n = "";
-        ArrayList<String> nombre_replicas_actual = new ArrayList<>(Arrays.asList(Naming.list("rmi://localhost:9991")));
+        ArrayList<String> nombre_replicas_actual = new ArrayList<>(Arrays.asList(Naming.list("rmi://" + server + ":9991")));
 
         if (!nombre_replicas.equals(nombre_replicas_actual)){
             nombre_replicas = nombre_replicas_actual;
@@ -190,7 +197,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
             for (int i = 0; i < nombre_replicas.size(); ++i){
                 replica_n = "rmi:" + nombre_replicas.get(i);
                 GestorDonacionesI gestor = (GestorDonacionesI) Naming.lookup(replica_n);
-                if (!replica_n.equals("rmi://localhost:9991/gestor" + id))
+                if (!replica_n.equals("rmi://" + server + ":9991/gestor" + id))
                     replicas.add(gestor);
 
                 // TODO Parametrizar el servidor a utilizar

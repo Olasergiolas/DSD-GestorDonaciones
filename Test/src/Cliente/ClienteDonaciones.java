@@ -41,7 +41,7 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
         return eleccion;
     }
 
-    public void donar(){
+    public void procesarInput(){
         int eleccion = -1;
         Scanner input = new Scanner(System.in);
 
@@ -66,8 +66,12 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
                 long total = 0;
 
                 try {
-                    total = gestor.getTotalDonado();
-                    System.out.println("Se ha donado un total de " + total + " euros");
+                    total = gestor.getTotalDonado(username);
+
+                    if (total == -1)
+                        System.out.println("Es necesario donar antes de consultar el total");
+                    else
+                        System.out.println("Se ha donado un total de " + total + " euros");
                 }catch (RemoteException e){
                     System.out.println("Error en la comunicación con el servidor, inténtelo de nuevo");
                 }
@@ -115,7 +119,7 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
             System.out.println("[3] Salir");
             System.out.println("*************************************************************");
 
-            donar();
+            procesarInput();
         }
     }
 }

@@ -16,6 +16,7 @@ public interface GestorDonacionesI extends Remote {
     void receiveMSG(String msg) throws RemoteException;
     void donar(long cantidad, String username) throws RemoteException;
     long getTotalDonado() throws RemoteException;
+    long getTotalDonado(String username) throws RemoteException;
     long getSubTotalDonado() throws RemoteException;
     void incrementarTotalDonado(long incremento) throws RemoteException;
     void broadcastMSG(String msg) throws RemoteException;
