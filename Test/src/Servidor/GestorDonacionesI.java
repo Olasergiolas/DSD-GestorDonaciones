@@ -14,7 +14,7 @@ public interface GestorDonacionesI extends Remote {
     AbstractMap.SimpleEntry<GestorDonacionesI, Integer> registrarCliente(String username) throws RemoteException, MalformedURLException, NotBoundException;
     void addCliente(String username) throws RemoteException;
     void receiveMSG(String msg) throws RemoteException;
-    void donar(long cantidad) throws RemoteException;
+    void donar(long cantidad, String username) throws RemoteException;
     long getTotalDonado() throws RemoteException;
     long getSubTotalDonado() throws RemoteException;
     void incrementarTotalDonado(long incremento) throws RemoteException;

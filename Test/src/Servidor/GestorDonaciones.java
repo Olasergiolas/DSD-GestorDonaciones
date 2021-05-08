@@ -10,6 +10,10 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.HashMap;
 
 // TODO Uso de archivos para los usuarios y la cantidad de donaciones que han realizado
 // TODO Evitar que un usuario consulte el total de donaciones si no ha donado todavía
@@ -22,17 +26,36 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     long total;
     ArrayList<GestorDonacionesI> replicas;
     ArrayList<String> nombre_replicas;
-    ArrayList<String> clientes;
+    HashMap<String, Boolean> clientes;
 
     public GestorDonaciones(int id, long total) throws RemoteException {
         super();
         this.id = id;
-        subtotal = 0;
         this.total = total;
+        subtotal = 0;
         replicas = new ArrayList<GestorDonacionesI>();
-        clientes = new ArrayList<String>();
+        clientes = new HashMap<>();
         nombre_replicas = new ArrayList<String>();
+
+        //inicializarBD();
     }
+
+    /*public void inicializarBD(){
+        try{
+            File archivo = new File("bd" + id + ".csv");
+            if (archivo.createNewFile()) {
+                System.out.println("BD" + id + " creada");
+
+                FileWriter escritor = new FileWriter("bd" + id + ".csv");
+                escritor.write("usuario, donante");
+            }
+            else
+                System.out.println("BD" + id + " ya existente");
+        }catch (IOException e){
+            System.out.println("Error al crear la BD de usuarios");
+            System.out.println(e.getMessage());
+        }
+    }*/
 
     public AbstractMap.SimpleEntry<GestorDonacionesI, Integer> registrarCliente(String username)
         throws RemoteException, MalformedURLException, NotBoundException{
@@ -84,12 +107,12 @@ public class GestorDonaciones extends UnicastRemoteObject implements
 
     @Override
     public synchronized void addCliente(String username) {
-        clientes.add(username);
+        clientes.put(username, false);
         System.out.println("Añadido un nuevo cliente!");
     }
 
     public boolean estaRegistrado(String username) throws RemoteException{
-        return clientes.contains(username);
+        return (clientes.get(username) == null) ? false : true;
     }
 
     public int getNumeroClientesRegistrados(){
@@ -97,7 +120,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     }
 
     @Override
-    public synchronized void donar(long cantidad) throws RemoteException {
+    public synchronized void donar(long cantidad, String username) throws RemoteException {
         // TODO Entrar en sección crítica
         // TODO Actualizar el subtotal
         // TODO Comunicar el incremento al resto de réplicas
@@ -109,9 +132,10 @@ public class GestorDonaciones extends UnicastRemoteObject implements
             actualizarListadoReplicas();
         } catch(MalformedURLException | NotBoundException e){
             System.out.println("Error en la comunicación con las réplicas");
-            System.out.println(e.getCause());
+            System.out.println(e.getMessage());
         }
 
+        clientes.put(username, true);
         subtotal += cantidad;
         total += cantidad;
         for (int i = 0; i < replicas.size(); ++i)

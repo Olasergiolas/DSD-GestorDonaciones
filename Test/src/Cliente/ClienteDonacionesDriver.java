@@ -23,7 +23,7 @@ public class ClienteDonacionesDriver {
             System.out.println("Encontrado el gestor" + args[0]);
             new Thread(new ClienteDonaciones(gestor)).start();
         }catch (RemoteException | MalformedURLException | NotBoundException e){
-            e.printStackTrace();
+            System.out.println("Error al interactuar con el servidor " + e.getMessage());
         }
     }
 }

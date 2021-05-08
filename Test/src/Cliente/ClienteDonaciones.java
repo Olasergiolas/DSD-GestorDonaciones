@@ -1,6 +1,5 @@
 package Cliente;
 
-import Servidor.GestorDonaciones;
 import Servidor.GestorDonacionesI;
 
 import java.net.MalformedURLException;
@@ -42,6 +41,43 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
         return eleccion;
     }
 
+    public void donar(){
+        int eleccion = -1;
+        Scanner input = new Scanner(System.in);
+
+        eleccion = comprobarEleccion(new ArrayList<Integer>(Arrays.asList(1, 2, 3)), input);
+        switch (eleccion){
+            case 1:
+                int cantidad = 0;
+                System.out.println("\nIndique la cantidad a donar: ");
+                if (input.hasNextInt()) {
+                    cantidad = input.nextInt();
+                    try {
+                        gestor.donar(cantidad, username);
+                        System.out.println("\nDonación de " + cantidad + " realizada con éxito");
+                    }catch (RemoteException e){
+                        System.out.println("Error al realizar la donación, inténtelo de nuevo");
+                    }
+                }
+                else
+                    System.out.println("\nIntroduzca un número por favor.");
+                break;
+            case 2:
+                long total = 0;
+
+                try {
+                    total = gestor.getTotalDonado();
+                    System.out.println("Se ha donado un total de " + total + " euros");
+                }catch (RemoteException e){
+                    System.out.println("Error en la comunicación con el servidor, inténtelo de nuevo");
+                }
+                break;
+
+            case 3:
+                System.exit(0);
+        }
+    }
+
     @Override
     public void registrarme(GestorDonacionesI gestor) throws RemoteException, MalformedURLException, NotBoundException {
         Scanner input = new Scanner(System.in);
@@ -65,73 +101,21 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
 
     @Override
     public void run(){
-        int eleccion = -1;
-        boolean continuar = true;
-        Scanner input = new Scanner(System.in);
-
-        while(continuar) {
-            System.out.println("\n********************  Bienvenido! ********************");
-            System.out.println("[1] Registrarte");
-            System.out.println("[2] Iniciar Sesión");
-            System.out.println("********************************************************");
-
-            eleccion = comprobarEleccion(new ArrayList<Integer>(Arrays.asList(1, 2)), input);
-
-            if (eleccion != -1)
-                continuar = false;
-        }
-
+        System.out.println("\n********************  Bienvenido! ********************\n");
         try {
-            switch (eleccion){
-                case 1:
-                    registrarme(gestor);
-                    break;
-                case 2:
-                    broadcastMSG("Prueba");
-                    break;
-            }
+            registrarme(gestor);
         }catch (RemoteException | MalformedURLException | NotBoundException e){
             e.printStackTrace();
         }
 
         while(true){
-            System.out.println("\n********************  Bienvenido " + username + "********************");
+            System.out.println("\n********************  Bienvenido " + username + " ********************");
             System.out.println("[1] Realizar donación");
             System.out.println("[2] Consultar total donado al sistema");
             System.out.println("[3] Salir");
-            System.out.println("***********************************************************************");
+            System.out.println("*************************************************************");
 
-            eleccion = comprobarEleccion(new ArrayList<Integer>(Arrays.asList(1, 2, 3)), input);
-
-            switch (eleccion){
-                case 1:
-                    int cantidad = 0;
-                    System.out.println("Indique la cantidad a donar: ");
-                    if (input.hasNextInt()) {
-                        cantidad = input.nextInt();
-                        try {
-                            gestor.donar(cantidad);
-                        }catch (RemoteException e){
-                            System.out.println("Error al realizar la donación, inténtelo de nuevo");
-                        }
-                    }
-                    else
-                        System.out.println("Introduzca un número por favor.");
-                    break;
-                case 2:
-                    long total = 0;
-
-                    try {
-                        total = gestor.getTotalDonado();
-                        System.out.println("Se ha donado un total de " + total + " euros");
-                    }catch (RemoteException e){
-                        System.out.println("Error en la comunicación con el servidor, inténtelo de nuevo");
-                    }
-                    break;
-
-                case 3:
-                    System.exit(0);
-            }
+            donar();
         }
     }
 }
