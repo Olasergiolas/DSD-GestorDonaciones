@@ -11,22 +11,30 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+// TODO Uso de archivos para los usuarios y la cantidad de donaciones que han realizado
+// TODO Evitar que un usuario consulte el total de donaciones si no ha donado todavía
+// TODO Implementar algoritmo de exlusión mutua
+
 public class GestorDonaciones extends UnicastRemoteObject implements
     GestorDonacionesI{
     int id = -1;
+    long subtotal;
+    long total;
     ArrayList<GestorDonacionesI> replicas;
     ArrayList<String> nombre_replicas;
-    ArrayList<ClienteDonacionesI> clientes;
+    ArrayList<String> clientes;
 
-    public GestorDonaciones(int id) throws RemoteException {
+    public GestorDonaciones(int id, long total) throws RemoteException {
         super();
         this.id = id;
+        subtotal = 0;
+        this.total = total;
         replicas = new ArrayList<GestorDonacionesI>();
-        clientes = new ArrayList<ClienteDonacionesI>();
+        clientes = new ArrayList<String>();
         nombre_replicas = new ArrayList<String>();
     }
 
-    public AbstractMap.SimpleEntry<GestorDonacionesI, Integer> registrarCliente(ClienteDonacionesI cliente)
+    public AbstractMap.SimpleEntry<GestorDonacionesI, Integer> registrarCliente(String username)
         throws RemoteException, MalformedURLException, NotBoundException{
         actualizarListadoReplicas();
 
@@ -40,32 +48,32 @@ public class GestorDonaciones extends UnicastRemoteObject implements
         AbstractMap.SimpleEntry<GestorDonacionesI, Integer> candidato;
         boolean continuar = true;
 
-        if (!estaRegistrado(cliente)){
+        if (!estaRegistrado(username)){
             min = clientes.size();
-            candidato = new AbstractMap.SimpleEntry<GestorDonacionesI, Integer>(this, min);
+            candidato = new AbstractMap.SimpleEntry<>(this, min);
 
             for (int i = 0; i < replicas.size() && continuar; ++i){
                 g = replicas.get(i);
-                if (!g.estaRegistrado(cliente)){
+                if (!g.estaRegistrado(username)){
                     tam = g.getNumeroClientesRegistrados();
                     if (tam < min){
                         min = tam;
-                        candidato = new AbstractMap.SimpleEntry<GestorDonacionesI, Integer>(g, tam);
+                        candidato = new AbstractMap.SimpleEntry<>(g, tam);
                     }
                 }
 
                 else {
                     continuar = false;
-                    candidato = new AbstractMap.SimpleEntry<GestorDonacionesI, Integer>(g, -1);
+                    candidato = new AbstractMap.SimpleEntry<>(g, -1);
                 }
             }
         }
 
         else
-            candidato = new AbstractMap.SimpleEntry<GestorDonacionesI, Integer>(this, -1);
+            candidato = new AbstractMap.SimpleEntry<>(this, -1);
 
         if (candidato.getKey() != null && candidato.getValue() != -1)
-            candidato.getKey().addCliente(cliente);
+            candidato.getKey().addCliente(username);
 
         else
             System.out.println("Cliente ya registrado anteriormente");
@@ -75,17 +83,58 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     }
 
     @Override
-    public synchronized void addCliente(ClienteDonacionesI cliente) {
-        clientes.add(cliente);
+    public synchronized void addCliente(String username) {
+        clientes.add(username);
         System.out.println("Añadido un nuevo cliente!");
     }
 
-    public boolean estaRegistrado(ClienteDonacionesI cliente) throws RemoteException{
-        return clientes.contains(cliente);
+    public boolean estaRegistrado(String username) throws RemoteException{
+        return clientes.contains(username);
     }
 
     public int getNumeroClientesRegistrados(){
         return clientes.size();
+    }
+
+    @Override
+    public synchronized void donar(long cantidad) throws RemoteException {
+        // TODO Entrar en sección crítica
+        // TODO Actualizar el subtotal
+        // TODO Comunicar el incremento al resto de réplicas
+        // TODO Salir de sección crítica
+
+        System.out.println("Recibida una donación de " + cantidad + " euros");
+
+        try {
+            actualizarListadoReplicas();
+        } catch(MalformedURLException | NotBoundException e){
+            System.out.println("Error en la comunicación con las réplicas");
+            System.out.println(e.getCause());
+        }
+
+        subtotal += cantidad;
+        total += cantidad;
+        for (int i = 0; i < replicas.size(); ++i)
+            replicas.get(i).incrementarTotalDonado(cantidad);
+
+    }
+
+    @Override
+    public long getTotalDonado() throws RemoteException {
+        // TODO Entrar en sección crítica
+        // TODO Devolver total
+        // TODO Salir de sección crítica
+        return total;
+    }
+
+    @Override
+    public long getSubTotalDonado() throws RemoteException {
+        return subtotal;
+    }
+
+    @Override
+    public void incrementarTotalDonado(long incremento) throws RemoteException {
+        total += incremento;
     }
 
     public void broadcastMSG(String msg) throws RemoteException{
