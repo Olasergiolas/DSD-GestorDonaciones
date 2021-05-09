@@ -61,9 +61,10 @@ public class GestorDonacionesDriver {
         }catch (AlreadyBoundException e){
             System.out.println("Id de gestor ya en uso, inténtelo con otro identificador");
             System.exit(-1);
-        }catch (AccessException e){
-            System.out.println("Por motivos de seguridad, no es posible registrar un gestor en un servidor remoto," +
+        }catch (ServerException e){
+            System.out.println("Por motivos de seguridad, no es posible registrar un gestor en un servidor remoto, " +
                     "mantenga los gestores en un mismo host");
+            System.exit(-1);
         }
         System.out.println(nombre + " registrado");
 
