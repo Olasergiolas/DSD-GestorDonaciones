@@ -13,7 +13,7 @@ public class GestorDonacionesDriver {
         Registry registry;
         String server;
 
-        if (args.length > 2){
+        if (args.length < 1 || args.length > 2){
             System.out.println("Modo de uso: idGestor [servidor]");
             System.exit(-1);
         }
@@ -53,6 +53,7 @@ public class GestorDonacionesDriver {
             System.exit(-1);
         }
 
+        //Registrar el nuevo gestor consultando primero si es el primer gestor en registrarse
         boolean token = (nombre_replicas_actual.isEmpty()) ? true : false;
         String nombre = "gestor" + args[0];
         System.out.println("Registrando el " + nombre + "...");
@@ -60,7 +61,6 @@ public class GestorDonacionesDriver {
         try {
             registry.bind(nombre, gestor);
             System.out.println(nombre + " registrado");
-            gestor.enviarToken();
         }catch (AlreadyBoundException e){
             System.out.println("Id de gestor ya en uso, inténtelo con otro identificador");
             System.exit(-1);
@@ -68,10 +68,19 @@ public class GestorDonacionesDriver {
             System.out.println("Por motivos de seguridad, no es posible registrar un gestor en un servidor remoto, " +
                     "mantenga los gestores en un mismo host");
             System.exit(-1);
-        }catch (MalformedURLException | NotBoundException | InterruptedException e){
-            System.out.println("Error al iniciar la EM basada en anillos");
         }
 
+        addControladorCierre(registry, nombre);
+
+        try {
+            gestor.gestionarToken();
+        } catch (MalformedURLException | NotBoundException | InterruptedException e) {
+            System.out.println("Error en la gestión del token basada en anillos");
+        }
+    }
+
+    // Gestionar la señal Ctrl + c
+    public static void addControladorCierre(Registry registry, String nombre){
         final Registry finalRegistry = registry;
         Signal.handle(new Signal("INT"),  // SIGINT
                 signal -> {

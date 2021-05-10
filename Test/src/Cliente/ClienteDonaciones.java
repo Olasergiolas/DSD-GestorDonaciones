@@ -72,7 +72,7 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
                         System.out.println("Es necesario donar antes de consultar el total");
                     else
                         System.out.println("Se ha donado un total de " + total + " euros");
-                }catch (RemoteException e){
+                }catch (RemoteException | InterruptedException e){
                     System.out.println("Error en la comunicación con el servidor, inténtelo de nuevo");
                 }
                 break;
@@ -96,11 +96,6 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
             System.out.println("Cliente previamente registrado, bienvenido de nuevo!");
         else
             System.out.println("Cliente registrado con éxito!");
-    }
-
-    @Override
-    public void broadcastMSG(String msg) throws RemoteException{
-        gestor.broadcastMSG(msg);
     }
 
     @Override

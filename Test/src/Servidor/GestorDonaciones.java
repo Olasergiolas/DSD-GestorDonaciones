@@ -3,17 +3,15 @@ package Servidor;
 import Cliente.ClienteDonacionesI;
 
 import java.net.MalformedURLException;
+import java.rmi.ConnectException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.HashMap;
 
 // TODO Uso de archivos para los usuarios y la cantidad de donaciones que han realizado
 // TODO Evitar que un usuario consulte el total de donaciones si no ha donado todavía
@@ -25,8 +23,9 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     long subtotal;
     long total;
     String server;
-    boolean token;
-    Estados estado;
+    volatile boolean token;
+    volatile Estados estado;
+    Queue<Long> donaciones_pendientes;
     ArrayList<GestorDonacionesI> replicas;
     ArrayList<String> nombre_replicas;
     HashMap<String, Boolean> clientes;
@@ -41,36 +40,14 @@ public class GestorDonaciones extends UnicastRemoteObject implements
         replicas = new ArrayList<GestorDonacionesI>();
         clientes = new HashMap<>();
         nombre_replicas = new ArrayList<String>();
+        donaciones_pendientes = new LinkedList<>();
         this.token = token;
-
-        //inicializarBD();
     }
-
-    /*public void inicializarBD(){
-        try{
-            File archivo = new File("bd" + id + ".csv");
-            if (archivo.createNewFile()) {
-                System.out.println("BD" + id + " creada");
-
-                FileWriter escritor = new FileWriter("bd" + id + ".csv");
-                escritor.write("usuario, donante");
-            }
-            else
-                System.out.println("BD" + id + " ya existente");
-        }catch (IOException e){
-            System.out.println("Error al crear la BD de usuarios");
-            System.out.println(e.getMessage());
-        }
-    }*/
 
     public AbstractMap.SimpleEntry<GestorDonacionesI, Integer> registrarCliente(String username)
         throws RemoteException, MalformedURLException, NotBoundException{
         actualizarListadoReplicas();
 
-        // TODO Comprobamos si esta réplica es la más indicada
-        // TODO Ver si está registrado el cliente está registrado en alguna réplica
-        // TODO Si no, buscar la réplica con menos clientes y hacerle un .addCliente
-        // TODO Si está registrado en alguna de las réplicas, devolver un error
         int min;
         int tam;
         GestorDonacionesI g;
@@ -127,15 +104,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
 
     @Override
     public synchronized void donar(long cantidad, String username) throws RemoteException, InterruptedException {
-        // TODO Entrar en sección crítica
-        // TODO Actualizar el subtotal
-        // TODO Comunicar el incremento al resto de réplicas
-        // TODO Salir de sección crítica
-
-        estado = Estados.INTENTANDO;
-        while(!token){Thread.sleep(100);}
-        estado = Estados.SC;
-
+        Thread.sleep(100);
         System.out.println("Recibida una donación de " + cantidad + " euros");
 
         try {
@@ -145,25 +114,34 @@ public class GestorDonaciones extends UnicastRemoteObject implements
             System.out.println(e.getMessage());
         }
 
-        clientes.put(username, true);
+        if (token) {
+            actualizarTotales(cantidad, username);
+        }
+        else{
+            estado = Estados.INTENTANDO;
+            System.out.println("Encolando donación de " + cantidad + "...");
+            donaciones_pendientes.add(cantidad);
+            clientes.put(username, true);
+        }
+    }
+
+    public void actualizarTotales(long cantidad, String username) throws RemoteException {
+        if (!username.isEmpty())
+            clientes.put(username, true);
+
         subtotal += cantidad;
         total += cantidad;
         for (int i = 0; i < replicas.size(); ++i)
             replicas.get(i).incrementarTotalDonado(cantidad);
-
-        estado = Estados.LIBRE;
     }
 
     @Override
     public long getTotalDonado() throws RemoteException {
-        // TODO Entrar en sección crítica
-        // TODO Devolver total
-        // TODO Salir de sección crítica
         return total;
     }
 
     @Override
-    public long getTotalDonado(String username) throws RemoteException {
+    public long getTotalDonado(String username) throws RemoteException, InterruptedException {
         return (clientes.get(username) == true) ? getTotalDonado() : -1;
     }
 
@@ -177,43 +155,64 @@ public class GestorDonaciones extends UnicastRemoteObject implements
         total += incremento;
     }
 
-    public void broadcastMSG(String msg) throws RemoteException{
-        System.out.println("Haciendo broadcast de: " + msg);
-
-        try {
-            actualizarListadoReplicas();
-        } catch(MalformedURLException | NotBoundException e){
-            e.printStackTrace();
-        }
-
-        for (int i = 0; i < replicas.size(); ++i)
-            replicas.get(i).receiveMSG(msg);
-    }
-
-    public void receiveMSG(String msg){
-        System.out.println(msg);
+    @Override
+    public synchronized void setToken(boolean t){
+        token = t;
     }
 
     @Override
-    public void enviarToken() throws RemoteException, MalformedURLException, NotBoundException, InterruptedException {
-        GestorDonacionesI g = getSiguienteReplica();
-        token = false;
-        Thread.sleep(100);
-        if (g == null)
-            this.recibirToken();
-
-        else
-            g.recibirToken();
+    public synchronized boolean getToken() throws RemoteException {
+        return token;
     }
 
     @Override
-    public void recibirToken() throws RemoteException, MalformedURLException, NotBoundException, InterruptedException {
-        if (estado == Estados.INTENTANDO){
-            token = true;
-            //System.out.println("USANDO TOKEN");
-            while (estado != Estados.LIBRE){Thread.sleep(100);}
+    public synchronized Estados getEstado() throws RemoteException {
+        return estado;
+    }
+
+    @Override
+    public int getId() {
+        return id;
+    }
+
+    @Override
+    public void gestionarToken() throws RemoteException, MalformedURLException, NotBoundException, InterruptedException {
+        GestorDonacionesI g;
+
+        while(true){
+            Thread.sleep(100);
+            if (getToken()) {
+                //System.out.println("Recibido token");
+                if (getEstado() == Estados.INTENTANDO){
+                    System.out.println("Usando token");
+                    despacharDonacionesPendientes();
+                    estado = Estados.LIBRE;
+                }
+
+                Thread.sleep(100);
+                g = getSiguienteReplica();
+                setToken(false);
+                Thread.sleep(100);
+
+                if (g != null) {
+                    try {
+                        System.out.println("Enviando token a " + g.getId());
+                        g.setToken(true);
+                    }catch (ConnectException e){
+                        System.out.println("Error al coordinar con uno de los gestores del anillo, abortando...");
+                        System.exit(-1);
+                    }
+
+                    Thread.sleep(100);
+                }
+
+                else {
+                    setToken(true);
+                }
+            }
+            else
+                System.out.println("NO TENGO TOKEN");
         }
-        enviarToken();
     }
 
     public GestorDonacionesI getSiguienteReplica() throws RemoteException, MalformedURLException, NotBoundException{
@@ -258,5 +257,17 @@ public class GestorDonaciones extends UnicastRemoteObject implements
                     replicas.add(gestor);
             }
         }
+    }
+
+    public void despacharDonacionesPendientes() throws RemoteException {
+        Iterator it = donaciones_pendientes.iterator();
+        long cantidad;
+
+        while(it.hasNext()){
+            cantidad = (long)it.next();
+            System.out.println("Despachando donación encolada de " + cantidad);
+            actualizarTotales(cantidad, "");
+        }
+        donaciones_pendientes.clear();
     }
 }
