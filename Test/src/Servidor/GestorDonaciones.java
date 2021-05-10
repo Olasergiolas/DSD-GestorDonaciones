@@ -1,7 +1,5 @@
 package Servidor;
 
-import Cliente.ClienteDonacionesI;
-
 import java.net.MalformedURLException;
 import java.rmi.ConnectException;
 import java.rmi.Naming;
@@ -9,17 +7,10 @@ import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-
-// TODO Uso de archivos para los usuarios y la cantidad de donaciones que han realizado
-// TODO Evitar que un usuario consulte el total de donaciones si no ha donado todavía
-// TODO Implementar algoritmo de exlusión mutua
 
 public class GestorDonaciones extends UnicastRemoteObject implements
     GestorDonacionesI{
-    int id = -1;
+    int id;
     long subtotal;
     long total;
     String server;
@@ -28,7 +19,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     Queue<Long> donaciones_pendientes;
     ArrayList<GestorDonacionesI> replicas;
     ArrayList<String> nombre_replicas;
-    HashMap<String, Boolean> clientes;
+    HashMap<String, Boolean> clientes;      //Clave: Usuario, Valor: esDonante
 
     public GestorDonaciones(int id, long total, String server, boolean token) throws RemoteException {
         super();
@@ -37,13 +28,19 @@ public class GestorDonaciones extends UnicastRemoteObject implements
         this.server = server;
         estado = Estados.LIBRE;
         subtotal = 0;
-        replicas = new ArrayList<GestorDonacionesI>();
+        replicas = new ArrayList<>();
         clientes = new HashMap<>();
-        nombre_replicas = new ArrayList<String>();
+        nombre_replicas = new ArrayList<>();
         donaciones_pendientes = new LinkedList<>();
         this.token = token;
     }
 
+    //  Este método se encarga de la lógica para redirigir a un cliente a su respectivo
+    //  gestor. Devuelve al cliente una referencia al gestor al que se tiene que dirigir,
+    //  independientemente de con el que se haya comunicado, además de un entero que indica
+    //  el número de clientes que tiene actualmente el gestor.
+    //  Este número será -1 en caso de que el cliente ya estuviera registrado anteriormente
+    //  en alguno de los gestores.
     public AbstractMap.SimpleEntry<GestorDonacionesI, Integer> registrarCliente(String username)
         throws RemoteException, MalformedURLException, NotBoundException{
         actualizarListadoReplicas();
@@ -95,7 +92,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     }
 
     public boolean estaRegistrado(String username) throws RemoteException{
-        return (clientes.get(username) == null) ? false : true;
+        return clientes.get(username) != null;
     }
 
     public int getNumeroClientesRegistrados(){
@@ -114,9 +111,14 @@ public class GestorDonaciones extends UnicastRemoteObject implements
             System.out.println(e.getMessage());
         }
 
+        //  Si tengo el token y se quiere realizar una donación
         if (token) {
+            estado = Estados.SC;
             actualizarTotales(cantidad, username);
+            estado = Estados.LIBRE;
         }
+        //  Si no tengo el token pero se quiere realizar una donación se encolan
+        //  las donaciones
         else{
             estado = Estados.INTENTANDO;
             System.out.println("Encolando donación de " + cantidad + "...");
@@ -126,13 +128,20 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     }
 
     public void actualizarTotales(long cantidad, String username) throws RemoteException {
+        //  Hacer al usuario donante
         if (!username.isEmpty())
             clientes.put(username, true);
 
         subtotal += cantidad;
         total += cantidad;
-        for (int i = 0; i < replicas.size(); ++i)
-            replicas.get(i).incrementarTotalDonado(cantidad);
+
+        for (int i = 0; i < replicas.size(); ++i){
+            try {
+                replicas.get(i).incrementarTotalDonado(cantidad);
+            }catch (ConnectException e){
+                System.out.println("Error al comunicar donación a una de las réplicas");
+            }
+        }
     }
 
     @Override
@@ -141,8 +150,8 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     }
 
     @Override
-    public long getTotalDonado(String username) throws RemoteException, InterruptedException {
-        return (clientes.get(username) == true) ? getTotalDonado() : -1;
+    public long getTotalDonado(String username) throws RemoteException {
+        return (clientes.get(username)) ? getTotalDonado() : -1;
     }
 
     @Override
@@ -175,6 +184,8 @@ public class GestorDonaciones extends UnicastRemoteObject implements
         return id;
     }
 
+    //  Este método se encargará del paso y utilización del token entre las réplicas
+    //  utilizando un algoritmo de exclusión mútua basado en anillos
     @Override
     public void gestionarToken() throws RemoteException, MalformedURLException, NotBoundException, InterruptedException {
         GestorDonacionesI g;
@@ -183,12 +194,17 @@ public class GestorDonaciones extends UnicastRemoteObject implements
             Thread.sleep(100);
             if (getToken()) {
                 //System.out.println("Recibido token");
+
+                //  Si se tiene el token y se necesita entrar a SC
                 if (getEstado() == Estados.INTENTANDO){
-                    System.out.println("Usando token");
+                    //System.out.println("Usando token");
+                    estado = Estados.SC;
                     despacharDonacionesPendientes();
                     estado = Estados.LIBRE;
                 }
 
+                //  Si no se va a utilizar el token o ya se ha utilizado, enviamos el
+                //  token a la siguiente réplica
                 Thread.sleep(100);
                 g = getSiguienteReplica();
                 setToken(false);
@@ -196,7 +212,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
 
                 if (g != null) {
                     try {
-                        System.out.println("Enviando token a " + g.getId());
+                        //System.out.println("Enviando token a " + g.getId());
                         g.setToken(true);
                     }catch (ConnectException e){
                         System.out.println("Error al coordinar con uno de los gestores del anillo, abortando...");
@@ -206,15 +222,19 @@ public class GestorDonaciones extends UnicastRemoteObject implements
                     Thread.sleep(100);
                 }
 
+                //  Si no hay más réplicas mantén el token
                 else {
                     setToken(true);
                 }
             }
-            else
-                System.out.println("NO TENGO TOKEN");
+            /*else
+                System.out.println("NO TENGO TOKEN");*/
         }
     }
 
+    //  Obtener el identificador de la siguiente réplica siguiendo una organización de
+    //  anillo. La siguiente réplica será la (gestorId mod n)+1. En caso de no haber más réplicas
+    //  se devolverá null
     public GestorDonacionesI getSiguienteReplica() throws RemoteException, MalformedURLException, NotBoundException{
         actualizarListadoReplicas();
         GestorDonacionesI g = null;
@@ -241,6 +261,8 @@ public class GestorDonaciones extends UnicastRemoteObject implements
         return g;
     }
 
+    //  Actualiza el listado de réplicas del gestor para que este conozca al resto
+    //  réplicas de gestores
     public void actualizarListadoReplicas() throws RemoteException,
             MalformedURLException, NotBoundException {
         String replica_n = "";
@@ -259,6 +281,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
         }
     }
 
+    //  Realizar las donaciones pendientes
     public void despacharDonacionesPendientes() throws RemoteException {
         Iterator it = donaciones_pendientes.iterator();
         long cantidad;

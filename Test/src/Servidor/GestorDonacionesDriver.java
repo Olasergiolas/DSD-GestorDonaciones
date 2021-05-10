@@ -13,6 +13,8 @@ public class GestorDonacionesDriver {
         Registry registry;
         String server;
 
+        //  El usuario deberá utilizar un parámetro obligatoriamente (idGestor) y opcionalmente,
+        //  indicar en qué servidor se encuentra el registro.
         if (args.length < 1 || args.length > 2){
             System.out.println("Modo de uso: idGestor [servidor]");
             System.exit(-1);
@@ -22,6 +24,9 @@ public class GestorDonacionesDriver {
             System.setSecurityManager(new SecurityManager());
         }
 
+        //  Si no se aporta un servidor, se asume localhost.
+        //  Se intenta crear un registro rmi dado ese puerto y servidor, en caso
+        //  de que ya exista se utiliza el ya existente.
         if (args.length == 1){
             server = "localhost";
             try {
@@ -32,14 +37,15 @@ public class GestorDonacionesDriver {
             }
         }
 
+        //  Obtenemos el registro del servidor proporcionado
         else{
             server = args[1];
             System.out.println("Obteniendo el registro en el servidor proporcionado...");
             registry = LocateRegistry.getRegistry(server, 9991);
         }
 
-        //Consultamos si había otras réplicas anteriormente para iniciar el gestor con un valor
-        //total actualizado
+        //  Consultamos si había otras réplicas anteriormente para iniciar el gestor con un valor
+        //  total de donaciones actualizado
         ArrayList<String> nombre_replicas_actual = new ArrayList<>();
         long total = 0;
         try {
@@ -53,7 +59,9 @@ public class GestorDonacionesDriver {
             System.exit(-1);
         }
 
-        //Registrar el nuevo gestor consultando primero si es el primer gestor en registrarse
+        //  Registrar el nuevo gestor consultando primero si es el primer gestor en registrarse,
+        //  en ese caso, se le aportará un token que utilizará para coordinarse con el resto de
+        //  gestores que se registren más adelante
         boolean token = (nombre_replicas_actual.isEmpty()) ? true : false;
         String nombre = "gestor" + args[0];
         System.out.println("Registrando el " + nombre + "...");
@@ -79,7 +87,7 @@ public class GestorDonacionesDriver {
         }
     }
 
-    // Gestionar la señal Ctrl + c
+    //  Gestionar la señal Ctrl + c para sacar del registro al gestor antes de salir
     public static void addControladorCierre(Registry registry, String nombre){
         final Registry finalRegistry = registry;
         Signal.handle(new Signal("INT"),  // SIGINT

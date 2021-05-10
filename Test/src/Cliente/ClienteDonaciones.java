@@ -3,6 +3,7 @@ package Cliente;
 import Servidor.GestorDonacionesI;
 
 import java.net.MalformedURLException;
+import java.rmi.ConnectException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -45,7 +46,7 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
         int eleccion = -1;
         Scanner input = new Scanner(System.in);
 
-        eleccion = comprobarEleccion(new ArrayList<Integer>(Arrays.asList(1, 2, 3)), input);
+        eleccion = comprobarEleccion(new ArrayList<>(Arrays.asList(1, 2, 3)), input);
         switch (eleccion){
             case 1:
                 int cantidad = 0;
@@ -89,7 +90,13 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
         System.out.println("Introduzca un nombre de usuario: ");
         username = input.nextLine();
 
-        AbstractMap.SimpleEntry<GestorDonacionesI, Integer> res = gestor.registrarCliente(username);
+        AbstractMap.SimpleEntry<GestorDonacionesI, Integer> res = null;
+        try {
+            res = gestor.registrarCliente(username);
+        }catch (ConnectException e){
+            System.out.println("Error en la conexión con el servidor, abortando...");
+            System.exit(-1);
+        }
         this.gestor = res.getKey();
 
         if (res.getValue() == -1)
