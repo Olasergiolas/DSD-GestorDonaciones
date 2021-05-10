@@ -40,7 +40,7 @@ public class GestorDonacionesDriver {
 
         //Consultamos si había otras réplicas anteriormente para iniciar el gestor con un valor
         //total actualizado
-        ArrayList<String> nombre_replicas_actual;
+        ArrayList<String> nombre_replicas_actual = new ArrayList<>();
         long total = 0;
         try {
             nombre_replicas_actual = new ArrayList<>(Arrays.asList(Naming.list("rmi://" + server + ":9991")));
@@ -53,11 +53,14 @@ public class GestorDonacionesDriver {
             System.exit(-1);
         }
 
+        boolean token = (nombre_replicas_actual.isEmpty()) ? true : false;
         String nombre = "gestor" + args[0];
         System.out.println("Registrando el " + nombre + "...");
-        GestorDonacionesI gestor = new GestorDonaciones(Integer.parseInt(args[0]), total, server);
+        GestorDonacionesI gestor = new GestorDonaciones(Integer.parseInt(args[0]), total, server, token);
         try {
             registry.bind(nombre, gestor);
+            System.out.println(nombre + " registrado");
+            gestor.enviarToken();
         }catch (AlreadyBoundException e){
             System.out.println("Id de gestor ya en uso, inténtelo con otro identificador");
             System.exit(-1);
@@ -65,8 +68,9 @@ public class GestorDonacionesDriver {
             System.out.println("Por motivos de seguridad, no es posible registrar un gestor en un servidor remoto, " +
                     "mantenga los gestores en un mismo host");
             System.exit(-1);
+        }catch (MalformedURLException | NotBoundException | InterruptedException e){
+            System.out.println("Error al iniciar la EM basada en anillos");
         }
-        System.out.println(nombre + " registrado");
 
         final Registry finalRegistry = registry;
         Signal.handle(new Signal("INT"),  // SIGINT

@@ -25,19 +25,23 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     long subtotal;
     long total;
     String server;
+    boolean token;
+    Estados estado;
     ArrayList<GestorDonacionesI> replicas;
     ArrayList<String> nombre_replicas;
     HashMap<String, Boolean> clientes;
 
-    public GestorDonaciones(int id, long total, String server) throws RemoteException {
+    public GestorDonaciones(int id, long total, String server, boolean token) throws RemoteException {
         super();
         this.id = id;
         this.total = total;
         this.server = server;
+        estado = Estados.LIBRE;
         subtotal = 0;
         replicas = new ArrayList<GestorDonacionesI>();
         clientes = new HashMap<>();
         nombre_replicas = new ArrayList<String>();
+        this.token = token;
 
         //inicializarBD();
     }
@@ -122,11 +126,15 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     }
 
     @Override
-    public synchronized void donar(long cantidad, String username) throws RemoteException {
+    public synchronized void donar(long cantidad, String username) throws RemoteException, InterruptedException {
         // TODO Entrar en sección crítica
         // TODO Actualizar el subtotal
         // TODO Comunicar el incremento al resto de réplicas
         // TODO Salir de sección crítica
+
+        estado = Estados.INTENTANDO;
+        while(!token){Thread.sleep(100);}
+        estado = Estados.SC;
 
         System.out.println("Recibida una donación de " + cantidad + " euros");
 
@@ -143,6 +151,7 @@ public class GestorDonaciones extends UnicastRemoteObject implements
         for (int i = 0; i < replicas.size(); ++i)
             replicas.get(i).incrementarTotalDonado(cantidad);
 
+        estado = Estados.LIBRE;
     }
 
     @Override
@@ -185,6 +194,54 @@ public class GestorDonaciones extends UnicastRemoteObject implements
         System.out.println(msg);
     }
 
+    @Override
+    public void enviarToken() throws RemoteException, MalformedURLException, NotBoundException, InterruptedException {
+        GestorDonacionesI g = getSiguienteReplica();
+        token = false;
+        Thread.sleep(100);
+        if (g == null)
+            this.recibirToken();
+
+        else
+            g.recibirToken();
+    }
+
+    @Override
+    public void recibirToken() throws RemoteException, MalformedURLException, NotBoundException, InterruptedException {
+        if (estado == Estados.INTENTANDO){
+            token = true;
+            //System.out.println("USANDO TOKEN");
+            while (estado != Estados.LIBRE){Thread.sleep(100);}
+        }
+        enviarToken();
+    }
+
+    public GestorDonacionesI getSiguienteReplica() throws RemoteException, MalformedURLException, NotBoundException{
+        actualizarListadoReplicas();
+        GestorDonacionesI g = null;
+        String[] regexpMatches;
+        int siguienteReplica;
+        boolean continuar = true;
+
+        for (int i = 0; i < nombre_replicas.size() && continuar; ++i){
+            regexpMatches = nombre_replicas.get(i).split("\\S+/gestor");
+            siguienteReplica = Integer.parseInt(regexpMatches[1]);
+
+            if (siguienteReplica > id){
+                //System.out.println("Encontrada réplica siguiente: " + siguienteReplica);
+                continuar = false;
+                g = replicas.get(i-1);
+            }
+        }
+
+        if (continuar && !replicas.isEmpty()) {
+            //System.out.println("Reenviando el token al primer gestor");
+            g = replicas.get(0);
+        }
+
+        return g;
+    }
+
     public void actualizarListadoReplicas() throws RemoteException,
             MalformedURLException, NotBoundException {
         String replica_n = "";
@@ -199,8 +256,6 @@ public class GestorDonaciones extends UnicastRemoteObject implements
                 GestorDonacionesI gestor = (GestorDonacionesI) Naming.lookup(replica_n);
                 if (!replica_n.equals("rmi://" + server + ":9991/gestor" + id))
                     replicas.add(gestor);
-
-                // TODO Parametrizar el servidor a utilizar
             }
         }
     }

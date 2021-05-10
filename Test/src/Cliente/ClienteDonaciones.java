@@ -55,7 +55,7 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
                     try {
                         gestor.donar(cantidad, username);
                         System.out.println("\nDonación de " + cantidad + " realizada con éxito");
-                    }catch (RemoteException e){
+                    }catch (RemoteException | InterruptedException e){
                         System.out.println("Error al realizar la donación, inténtelo de nuevo");
                     }
                 }
