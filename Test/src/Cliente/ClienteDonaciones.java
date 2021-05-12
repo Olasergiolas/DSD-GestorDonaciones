@@ -12,8 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
 
-public class ClienteDonaciones  extends UnicastRemoteObject implements
-    ClienteDonacionesI, Runnable{
+public class ClienteDonaciones  extends UnicastRemoteObject implements Runnable{
     Servidor.GestorDonacionesI gestor;
     String username;
 
@@ -83,7 +82,6 @@ public class ClienteDonaciones  extends UnicastRemoteObject implements
         }
     }
 
-    @Override
     public void registrarme(GestorDonacionesI gestor) throws RemoteException, MalformedURLException, NotBoundException {
         Scanner input = new Scanner(System.in);
 

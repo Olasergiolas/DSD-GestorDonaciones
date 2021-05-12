@@ -266,8 +266,13 @@ public class GestorDonaciones extends UnicastRemoteObject implements
     public void actualizarListadoReplicas() throws RemoteException,
             MalformedURLException, NotBoundException {
         String replica_n = "";
-        ArrayList<String> nombre_replicas_actual = new ArrayList<>(Arrays.asList(Naming.list("rmi://" + server + ":9991")));
-
+        ArrayList<String> nombre_replicas_actual = null;
+        try {
+            nombre_replicas_actual = new ArrayList<>(Arrays.asList(Naming.list("rmi://" + server + ":9991")));
+        }catch (ConnectException e){
+            System.out.println("Conexión con el registro RMI perdida, abortando...");
+            System.exit(-1);
+        }
         if (!nombre_replicas.equals(nombre_replicas_actual)){
             nombre_replicas = nombre_replicas_actual;
             replicas.clear();
